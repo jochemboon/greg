@@ -9,6 +9,7 @@ mod highlight;
 mod install;
 mod lang;
 mod lsp;
+mod watch;
 
 use std::path::PathBuf;
 

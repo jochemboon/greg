@@ -3,6 +3,7 @@
 
 use crate::highlight::HlCache;
 use crate::lang::{self, Language};
+use crate::watch::DiskStamp;
 use ropey::Rope;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -103,6 +104,11 @@ pub struct Document {
     pub hl: HlCache,
     /// Set when the cursor moved and the view should scroll to it.
     pub scroll_to_cursor: bool,
+    /// The file on disk that the saved state of this buffer corresponds to
+    /// (`None`: not on disk yet).
+    pub disk_base: Option<DiskStamp>,
+    /// What the file on disk looked like when last checked.
+    pub disk_seen: Option<DiskStamp>,
     undo: Vec<Transaction>,
     redo: Vec<Transaction>,
     next_tx_id: u64,
@@ -134,6 +140,8 @@ impl Document {
             diagnostics: Vec::new(),
             hl: HlCache::default(),
             scroll_to_cursor: false,
+            disk_base: None,
+            disk_seen: None,
             undo: Vec::new(),
             redo: Vec::new(),
             next_tx_id: 1,
@@ -143,14 +151,15 @@ impl Document {
     }
 
     pub fn open(path: &Path, tab_size: usize, insert_spaces: bool) -> Result<Self, String> {
-        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        if bytes.iter().take(8192).any(|&b| b == 0) {
-            return Err(format!("{} looks like a binary file", path.display()));
-        }
-        let text = String::from_utf8(bytes)
-            .map_err(|_| format!("{} is not valid UTF-8", path.display()))?;
+        // Stat before reading: a change in between then shows up as a
+        // (harmless) reload rather than being missed.
+        let stamp = DiskStamp::of(path);
+        let text = read_text(path)?;
         let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        Ok(Self::new(&text, Some(path), tab_size, insert_spaces))
+        let mut doc = Self::new(&text, Some(path), tab_size, insert_spaces);
+        doc.disk_base = stamp;
+        doc.disk_seen = stamp;
+        Ok(doc)
     }
 
     pub fn save(&mut self) -> Result<(), String> {
@@ -162,8 +171,88 @@ impl Document {
             .map_err(|e| format!("{}: {e}", path.display()))?;
         use std::io::Write;
         w.flush().map_err(|e| format!("{}: {e}", path.display()))?;
+        drop(w);
         self.saved_tx_id = self.current_tx_id();
+        self.disk_base = DiskStamp::of(&path);
+        self.disk_seen = self.disk_base;
         Ok(())
+    }
+
+    /// The file on disk was modified since this buffer was loaded or saved,
+    /// so saving would overwrite someone else's changes.
+    pub fn disk_changed(&self) -> bool {
+        self.path
+            .as_deref()
+            .and_then(DiskStamp::of)
+            .is_some_and(|now| Some(now) != self.disk_base)
+    }
+
+    /// The file existed but has been deleted on disk.
+    pub fn deleted_on_disk(&self) -> bool {
+        self.disk_base.is_some() && self.disk_seen.is_none()
+    }
+
+    /// Load the file's current contents from disk. The swap is one undoable
+    /// edit touching only the region that differs, so the cursor, scroll and
+    /// highlighting elsewhere are kept. Returns whether the text changed.
+    pub fn reload(&mut self) -> Result<bool, String> {
+        let path = self.path.clone().ok_or("document has no path")?;
+        let stamp = DiskStamp::of(&path);
+        let text = read_text(&path)?;
+        let changed = self.replace_text(&text);
+        if text.contains("\r\n") {
+            self.line_ending = "\r\n";
+        } else if text.contains('\n') {
+            self.line_ending = "\n";
+        }
+        self.saved_tx_id = self.current_tx_id();
+        self.disk_base = stamp;
+        self.disk_seen = stamp;
+        Ok(changed)
+    }
+
+    /// Replace the whole text with `new`, editing only the differing middle.
+    fn replace_text(&mut self, new: &str) -> bool {
+        let old_len = self.len_chars();
+        let new_len = new.chars().count();
+        let prefix = self
+            .rope
+            .chars()
+            .zip(new.chars())
+            .take_while(|(a, b)| a == b)
+            .count();
+        if prefix == old_len && prefix == new_len {
+            return false;
+        }
+        let max_suffix = old_len.min(new_len) - prefix;
+        let suffix = self
+            .rope
+            .chars_at(old_len)
+            .reversed()
+            .zip(new.chars().rev())
+            .take(max_suffix)
+            .take_while(|(a, b)| a == b)
+            .count();
+        let (start, old_end, new_end) = (prefix, old_len - suffix, new_len - suffix);
+        let middle: String = new.chars().skip(start).take(new_end - start).collect();
+        // Keep the selection where it was relative to the unchanged text.
+        let map = |p: usize| {
+            if p <= start {
+                p
+            } else if p >= old_end {
+                p - old_end + new_end
+            } else {
+                p.min(new_end)
+            }
+        };
+        let after = Selection {
+            anchor: map(self.sel.anchor),
+            head: map(self.sel.head),
+        };
+        let scroll = self.scroll_to_cursor;
+        self.edit(EditKind::Other, vec![(start, old_end, middle)], after);
+        self.scroll_to_cursor = scroll;
+        true
     }
 
     pub fn title(&self) -> String {
@@ -919,6 +1008,14 @@ impl Document {
     }
 }
 
+fn read_text(path: &Path) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    if bytes.iter().take(8192).any(|&b| b == 0) {
+        return Err(format!("{} looks like a binary file", path.display()));
+    }
+    String::from_utf8(bytes).map_err(|_| format!("{} is not valid UTF-8", path.display()))
+}
+
 pub fn advance_col(col: usize, c: char, tab_size: usize) -> usize {
     if c == '\t' {
         col + tab_size - col % tab_size
@@ -1004,6 +1101,43 @@ mod tests {
         d.undo();
         assert!(!d.is_dirty());
         assert_eq!(d.rope.to_string(), "a");
+    }
+
+    #[test]
+    fn replace_text_edits_only_the_difference() {
+        let mut d = doc("aaa\nbbb\nccc\n");
+        d.set_cursor(10, false); // in "ccc"
+        d.saved_tx_id = d.current_tx_id();
+        assert!(d.replace_text("aaa\nBBBBB\nccc\n"));
+        assert_eq!(d.rope.to_string(), "aaa\nBBBBB\nccc\n");
+        assert_eq!(d.sel.head, 12, "cursor after the change shifts with it");
+        assert!(!d.replace_text("aaa\nBBBBB\nccc\n"), "same text is a no-op");
+        d.undo();
+        assert_eq!(d.rope.to_string(), "aaa\nbbb\nccc\n");
+        // Repeated characters at the boundary mustn't double count.
+        let mut d = doc("aa");
+        d.replace_text("aaa");
+        assert_eq!(d.rope.to_string(), "aaa");
+        d.replace_text("");
+        assert_eq!(d.rope.to_string(), "");
+    }
+
+    #[test]
+    fn reload_is_undoable_and_clean() {
+        let path = std::env::temp_dir().join(format!("slate-reload-{}.txt", std::process::id()));
+        std::fs::write(&path, "one\n").unwrap();
+        let mut d = Document::open(&path, 4, true).unwrap();
+        assert!(!d.disk_changed());
+        std::fs::write(&path, "one\ntwo\r\n").unwrap();
+        assert!(d.disk_changed());
+        assert!(d.reload().unwrap());
+        assert_eq!(d.rope.to_string(), "one\ntwo\r\n");
+        assert_eq!(d.line_ending, "\r\n");
+        assert!(!d.is_dirty() && !d.disk_changed());
+        d.undo();
+        assert_eq!(d.rope.to_string(), "one\n");
+        assert!(d.is_dirty(), "undoing a reload differs from disk");
+        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]

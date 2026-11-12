@@ -7,6 +7,7 @@ use crate::highlight::{Highlighter, HlCache, ThemeColors};
 use crate::lsp::{
     self, LspEvent, LspManager, PosEncoding, RawDiagnostic, ServerState, ServerStatus,
 };
+use crate::watch::{DiskStamp, FileWatcher};
 use eframe::egui::{
     self, Color32, Id, Key, KeyboardShortcut, Modifiers, RichText, TextEdit, Ui, ViewportCommand,
 };
@@ -47,6 +48,10 @@ enum Dialog {
     ConfirmClose {
         idx: usize,
     },
+    /// Saving would overwrite changes made to the file outside the editor.
+    SaveConflict {
+        idx: usize,
+    },
     ConfirmQuit,
     Servers,
 }
@@ -74,6 +79,8 @@ pub struct App {
     hl: Highlighter,
     colors: ThemeColors,
     lsp: LspManager,
+    watcher: FileWatcher,
+    window_focused: bool,
     diags: DiagStore,
     logs: VecDeque<String>,
     server_state: BTreeMap<String, ServerState>,
@@ -109,6 +116,8 @@ impl App {
             hl,
             colors,
             lsp,
+            watcher: FileWatcher::new(cc.egui_ctx.clone()),
+            window_focused: true,
             diags: BTreeMap::new(),
             logs: VecDeque::new(),
             server_state: BTreeMap::new(),
@@ -210,6 +219,12 @@ impl App {
     }
 
     fn save(&mut self, idx: usize) -> bool {
+        self.save_with(idx, false)
+    }
+
+    /// Save, first asking whether to overwrite if the file was changed on
+    /// disk since it was loaded (unless `overwrite`).
+    fn save_with(&mut self, idx: usize, overwrite: bool) -> bool {
         let Some(doc) = self.docs.get_mut(idx) else {
             return false;
         };
@@ -220,6 +235,11 @@ impl App {
                 text: self.default_dir(),
                 error: None,
             });
+            return false;
+        }
+        if !overwrite && doc.disk_changed() {
+            self.active = idx;
+            self.dialog = Some(Dialog::SaveConflict { idx });
             return false;
         }
         match doc.save() {
@@ -253,6 +273,9 @@ impl App {
         doc.path = Some(absolute(&path));
         doc.language = crate::lang::detect(&path);
         doc.hl = HlCache::default();
+        // The user picked this path, so overwriting whatever is there is intended.
+        doc.disk_base = DiskStamp::of(&path);
+        doc.disk_seen = doc.disk_base;
         self.lsp.did_open(&self.docs[self.active]);
         self.save(self.active);
     }
@@ -345,6 +368,76 @@ impl App {
             let _ = std::fs::write(&path, USER_CONFIG_TEMPLATE);
         }
         self.open_path(&path);
+    }
+
+    // ------------------------------------------------------------------
+    // Files changed outside the editor
+    // ------------------------------------------------------------------
+
+    fn handle_disk_changes(&mut self, ctx: &egui::Context) {
+        // Regaining focus is when external edits are most likely; check
+        // everything at once instead of waiting for the next poll.
+        let focused = ctx.input(|i| i.viewport().focused).unwrap_or(true);
+        let refocused = focused && !self.window_focused;
+        self.window_focused = focused;
+        let mut changed: Vec<PathBuf> = self.watcher.rx.try_iter().collect();
+        if refocused {
+            changed.extend(self.docs.iter().filter_map(|d| d.path.clone()));
+        }
+        for path in changed {
+            for i in 0..self.docs.len() {
+                if self.docs[i].path.as_ref() == Some(&path) {
+                    self.check_disk(i);
+                }
+            }
+        }
+        self.watcher.sync(
+            self.docs
+                .iter()
+                .filter_map(|d| Some((d.path.as_ref()?, d.disk_seen))),
+        );
+    }
+
+    /// React to the document's file having changed on disk: reload it if it
+    /// has no unsaved changes, otherwise keep the user's edits (saving will
+    /// then ask before overwriting).
+    fn check_disk(&mut self, idx: usize) {
+        let doc = &mut self.docs[idx];
+        let Some(path) = doc.path.clone() else { return };
+        let now = DiskStamp::of(&path);
+        if now == doc.disk_seen {
+            return;
+        }
+        doc.disk_seen = now;
+        let name = doc.title();
+        if now.is_none() {
+            if doc.disk_base.is_some() {
+                self.set_status(format!("{name} was deleted on disk"));
+            }
+        } else if doc.is_dirty() {
+            self.set_status(format!(
+                "{name} changed on disk; you have unsaved changes (saving will ask what to keep)"
+            ));
+        } else {
+            self.reload_from_disk(idx);
+        }
+    }
+
+    fn reload_from_disk(&mut self, idx: usize) {
+        let doc = &mut self.docs[idx];
+        let name = doc.title();
+        match doc.reload() {
+            Ok(true) => {
+                doc.lsp_dirty = false;
+                self.lsp.did_change(&self.docs[idx]);
+                self.set_status(format!("Reloaded {name} (changed on disk)"));
+                if self.docs[idx].path.as_deref() == Some(&config::config_path()) {
+                    self.reload_config();
+                }
+            }
+            Ok(false) => {}
+            Err(e) => self.set_status(format!("Couldn't reload {name}: {e}")),
+        }
     }
 
     // ------------------------------------------------------------------
@@ -874,9 +967,16 @@ impl App {
                             .diagnostics
                             .iter()
                             .any(|d| d.severity == Severity::Error);
+                        let deleted = doc.deleted_on_disk();
+                        if deleted {
+                            label.push_str(" (deleted)");
+                        }
                         let mut text = RichText::new(label);
                         if has_err {
                             text = text.color(severity_color(Severity::Error));
+                        }
+                        if deleted {
+                            text = text.strikethrough();
                         }
                         let r = ui.selectable_label(i == self.active, text);
                         let r = match &doc.path {
@@ -1411,6 +1511,34 @@ impl App {
                     }
                 });
             }
+            Dialog::SaveConflict { idx } => {
+                let idx = *idx;
+                let name = self.docs.get(idx).map(|d| d.title()).unwrap_or_default();
+                ui.set_max_width(460.0);
+                ui.label(format!(
+                    "{name} was changed on disk after you opened it. \
+                     Overwrite it with your version, or discard your changes and \
+                     load the version on disk? (Reloading can be undone with Ctrl+Z.)"
+                ));
+                ui.horizontal(|ui| {
+                    if ui.button("Overwrite").clicked() {
+                        keep = false;
+                        self.save_with(idx, true);
+                    }
+                    if ui.button("Reload from Disk").clicked() {
+                        keep = false;
+                        if idx < self.docs.len() {
+                            self.reload_from_disk(idx);
+                        }
+                    }
+                    if ui.button("Cancel").clicked() {
+                        keep = false;
+                    }
+                });
+                if !keep {
+                    self.focus_editor = true;
+                }
+            }
             Dialog::Servers => {
                 ui.set_width(640.0);
                 ui.heading("Language servers");
@@ -1506,6 +1634,7 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         self.ctx = Some(ctx.clone());
         self.handle_lsp_events();
+        self.handle_disk_changes(&ctx);
 
         if ctx.input(|i| i.viewport().close_requested())
             && !self.allow_close
@@ -1892,6 +2021,67 @@ mod tests {
         h.key_press_modifiers(Modifiers::ALT, Key::ArrowUp);
         h.run_steps(2);
         assert_eq!(text(&h), "one\ntwo\n");
+    }
+
+    /// Run frames until `cond` holds, giving the watcher thread time to poll.
+    fn wait_for(h: &mut Harness<'static, App>, cond: impl Fn(&App) -> bool) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            h.run_steps(1);
+            if cond(h.state()) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        false
+    }
+
+    #[test]
+    fn clean_file_reloads_when_changed_on_disk() {
+        let (mut h, file) = harness_with("one\ntwo\n");
+        std::fs::write(&file, "one\ntwo\nthree\n").unwrap();
+        assert!(wait_for(&mut h, |a| a.docs[0].rope == "one\ntwo\nthree\n"));
+        assert!(!h.state().docs[0].is_dirty());
+        // The reload is undoable, like in VSCode.
+        h.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+        h.run_steps(2);
+        assert_eq!(text(&h), "one\ntwo\n");
+    }
+
+    #[test]
+    fn dirty_file_keeps_edits_and_save_asks() {
+        let (mut h, file) = harness_with("mine\n");
+        h.event(egui::Event::Text("x".into()));
+        h.run_steps(2);
+        std::fs::write(&file, "theirs, longer\n").unwrap();
+        let file2 = file.clone();
+        assert!(wait_for(&mut h, move |a| a.docs[0].disk_seen
+            == DiskStamp::of(&file2)));
+        assert_eq!(text(&h), "xmine\n", "unsaved edits are never discarded");
+
+        h.key_press_modifiers(Modifiers::COMMAND, Key::S);
+        h.run_steps(2);
+        assert!(matches!(
+            h.state().dialog,
+            Some(Dialog::SaveConflict { .. })
+        ));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "theirs, longer\n");
+
+        h.state_mut().dialog = None;
+        h.state_mut().save_with(0, true);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "xmine\n");
+        assert!(!h.state().docs[0].is_dirty());
+    }
+
+    #[test]
+    fn deleted_file_is_marked_and_comes_back() {
+        let (mut h, file) = harness_with("keep me\n");
+        std::fs::remove_file(&file).unwrap();
+        assert!(wait_for(&mut h, |a| a.docs[0].deleted_on_disk()));
+        assert_eq!(text(&h), "keep me\n");
+        std::fs::write(&file, "restored\n").unwrap();
+        assert!(wait_for(&mut h, |a| a.docs[0].rope == "restored\n"));
+        assert!(!h.state().docs[0].deleted_on_disk());
     }
 
     /// Full GUI flow with no Node anywhere: open a JSON file, click

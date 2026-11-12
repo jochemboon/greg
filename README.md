@@ -8,6 +8,9 @@ linters yourself.
 - Starts instantly, uses no CPU when idle (it only repaints on input).
 - A 12 MB static-ish binary with syntax grammars and themes built in.
 - Lint diagnostics as squiggles, gutter markers, hover tooltips and a Problems panel.
+- Like VSCode, open files that change on disk (git, formatters, other editors) reload
+  automatically. The reload can be undone with `Ctrl+Z`. A tab with unsaved changes
+  keeps your edits, and saving it asks whether to overwrite the newer file.
 
 ## Build
 
@@ -89,6 +92,7 @@ src/editor.rs      text widget: virtualised rendering, input, squiggles
 src/buffer.rs      rope document, selection, undo/redo, edit commands
 src/highlight.rs   incremental syntect highlighting (TextMate grammars)
 src/lsp.rs         LSP client: push + pull diagnostics, UTF-8/16 positions
+src/watch.rs       background poller that spots open files changing on disk
 src/config.rs      settings loading/merging; defaults in default_config.toml
 src/install.rs     managed installs: private Node.js + npm servers, binary downloads
 ```
