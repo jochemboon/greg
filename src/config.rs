@@ -30,8 +30,21 @@ pub struct Config {
     pub language_servers: BTreeMap<String, ServerConfig>,
 }
 
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ServerKind {
+    /// A Language Server Protocol server.
+    #[default]
+    Lsp,
+    /// `cargo check`-style command printing rustc's JSON diagnostics; run on
+    /// open and save (see `check.rs`).
+    CargoCheck,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct ServerConfig {
+    #[serde(default)]
+    pub kind: ServerKind,
     pub command: String,
     #[serde(default)]
     pub args: Vec<String>,

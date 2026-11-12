@@ -48,12 +48,24 @@ folder removes all of it. Downloads use `curl`, `tar` and `gzip`.
 | TypeScript/JS type errors | `typescript-language-server` + TypeScript 5 | npm |
 | TypeScript 7+ (native) | `tsc --lsp --stdio` | npm; enable `typescript-native` in settings |
 | Python | `pyright-langserver` (Pylance's open-source core) | npm |
-| Rust | `rust-analyzer` | official GitHub release binary |
+| Rust | `cargo check` on open and save (not an LSP server) | comes with Rust (rustup) |
+| Rust, as you type (off by default) | `rust-analyzer` | official GitHub release binary |
 | Go / C / C++ | `gopls` / `clangd` | install yourself (`go install`, `dnf install clang-tools-extra`) |
 
 Each server is looked up in the project's `node_modules/.bin` first, then in
 Slate's own installs, then on `PATH`. If you do install things yourself, they're used
 too.
+
+**Rust note:** Rust diagnostics come from `cargo check`, which Slate runs when you
+open a file of a Cargo workspace and again on every save. You get the compiler's
+own errors and warnings, and nothing stays in memory between checks.
+rust-analyzer updates as you type, but it indexes every dependency, which is often
+1–2 GB of RAM, mostly for completion and navigation that Slate doesn't have yet.
+Only workspaces you have files open in are checked. Use clippy with
+`args = ["clippy", "--workspace", "--all-targets"]` under
+`[language_servers.cargo-check]`, or switch to rust-analyzer with
+`enabled = true` under `[language_servers.rust-analyzer]` (and `enabled = false`
+for `cargo-check`).
 
 **ESLint note:** as in VSCode, the ESLint server runs *your project's* `eslint`
 package (so your config and plugins apply). The project therefore needs its
@@ -117,6 +129,7 @@ src/editor.rs      text widget: virtualised rendering, input, squiggles
 src/buffer.rs      rope document, selection, undo/redo, edit commands
 src/highlight.rs   incremental syntect highlighting (TextMate grammars)
 src/lsp.rs         LSP client: push + pull diagnostics, UTF-8/16 positions
+src/check.rs       Rust diagnostics from `cargo check` on open/save
 src/watch.rs       background poller that spots open files changing on disk
 src/config.rs      settings loading/merging; defaults in default_config.toml
 src/fonts.rs       font settings: lookup via fontconfig, checks, installing in egui

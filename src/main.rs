@@ -4,6 +4,7 @@
 mod aap64;
 mod app;
 mod buffer;
+mod check;
 mod config;
 mod editor;
 mod fonts;

@@ -9,7 +9,8 @@
 //! and forwards interesting notifications to the UI thread over a channel.
 
 use crate::buffer::{Diagnostic, Document, Severity};
-use crate::config::ServerConfig;
+use crate::check::CargoCheck;
+use crate::config::{ServerConfig, ServerKind};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
 use ropey::Rope;
@@ -627,6 +628,8 @@ enum Failure {
 pub struct LspManager {
     configs: BTreeMap<String, ServerConfig>,
     clients: HashMap<String, LspClient>,
+    /// `kind = "cargo-check"` entries, which aren't LSP servers.
+    checks: HashMap<String, CargoCheck>,
     failed: HashMap<String, Failure>,
     installing: HashSet<String>,
     root: Option<PathBuf>,
@@ -645,6 +648,7 @@ impl LspManager {
         Self {
             configs,
             clients: HashMap::new(),
+            checks: HashMap::new(),
             failed: HashMap::new(),
             installing: HashSet::new(),
             root,
@@ -663,6 +667,9 @@ impl LspManager {
 
     pub fn shutdown(&mut self) {
         for (_, mut c) in self.clients.drain() {
+            c.shutdown();
+        }
+        for (_, mut c) in self.checks.drain() {
             c.shutdown();
         }
     }
@@ -714,6 +721,7 @@ impl LspManager {
             .servers_for(lang)
             .into_iter()
             .filter(|n| only.is_none_or(|o| o == n))
+            .filter(|n| self.configs[n].kind == ServerKind::Lsp)
             .collect();
         for name in &names {
             if !start
@@ -770,8 +778,49 @@ impl LspManager {
         self.open_on(doc, Some(server));
     }
 
+    /// Running cargo-check entries for a language, starting them first with
+    /// `start`.
+    fn checks_for(&mut self, lang: &str, start: bool, only: Option<&str>) -> Vec<&mut CargoCheck> {
+        let names: Vec<String> = self
+            .servers_for(lang)
+            .into_iter()
+            .filter(|n| only.is_none_or(|o| o == n))
+            .filter(|n| self.configs[n].kind == ServerKind::CargoCheck)
+            .collect();
+        for name in &names {
+            if !start || self.checks.contains_key(name) || self.failed.contains_key(name) {
+                continue;
+            }
+            let cfg = &self.configs[name];
+            match CargoCheck::new(name, cfg, self.tx.clone(), self.ctx.clone()) {
+                Ok(c) => {
+                    self.checks.insert(name.clone(), c);
+                }
+                Err(e) => {
+                    let _ = self.tx.send(LspEvent::Log {
+                        server: name.clone(),
+                        message: format!(
+                            "`{}` is not installed (install Rust with rustup, or put `{0}` on PATH)",
+                            cfg.command
+                        ),
+                    });
+                    let failure = e.map_or(Failure::NotInstalled, Failure::Error);
+                    self.failed.insert(name.clone(), failure);
+                }
+            }
+        }
+        self.checks
+            .iter_mut()
+            .filter(|(n, _)| names.contains(n))
+            .map(|(_, c)| c)
+            .collect()
+    }
+
     fn open_on(&mut self, doc: &Document, only: Option<&str>) {
         let Some(path) = &doc.path else { return };
+        for c in self.checks_for(doc.language.id, true, only) {
+            c.opened(path);
+        }
         let uri = path_to_uri(path);
         let text = doc.rope.to_string();
         for c in self.clients_for(doc.language.id, path, true, only) {
@@ -801,6 +850,9 @@ impl LspManager {
 
     pub fn did_save(&mut self, doc: &Document) {
         let Some(path) = &doc.path else { return };
+        for c in self.checks_for(doc.language.id, false, None) {
+            c.saved(path);
+        }
         let uri = path_to_uri(path);
         let text = doc.rope.to_string();
         for c in self.clients_for(doc.language.id, path, false, None) {
@@ -827,7 +879,9 @@ impl LspManager {
             None => ServerStatus::Disabled,
             Some(c) if !c.enabled => ServerStatus::Disabled,
             _ if self.installing.contains(name) => ServerStatus::Installing,
-            _ if self.clients.contains_key(name) => ServerStatus::Running,
+            _ if self.clients.contains_key(name) || self.checks.contains_key(name) => {
+                ServerStatus::Running
+            }
             _ => match self.failed.get(name) {
                 Some(Failure::NotInstalled) => ServerStatus::NotInstalled,
                 Some(Failure::Error(m)) => ServerStatus::Failed(m.clone()),
@@ -855,6 +909,9 @@ impl LspManager {
     /// Stop a server (if running) and allow it to start again on the next `did_open_on`.
     pub fn reset(&mut self, name: &str) {
         if let Some(mut c) = self.clients.remove(name) {
+            c.shutdown();
+        }
+        if let Some(mut c) = self.checks.remove(name) {
             c.shutdown();
         }
         self.failed.remove(name);
@@ -952,6 +1009,10 @@ mod integration {
             .language_servers
             .into_iter()
             .filter(|(n, _)| n == server)
+            .map(|(n, mut c)| {
+                c.enabled = true; // e.g. rust-analyzer is off by default
+                (n, c)
+            })
             .collect();
         let mut mgr = LspManager::new(configs, Some(root.to_path_buf()), egui::Context::default());
         let doc = Document::open(file, 4, true).unwrap();
