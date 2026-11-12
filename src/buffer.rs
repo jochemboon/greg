@@ -1,5 +1,6 @@
 //! Text document model: a rope plus a single selection, undo/redo history
-//! and diagnostics that track edits.
+//! and diagnostics that track edits. A document shown in several split panes
+//! has a cursor per pane ("view"); see [`Document::focus_view`].
 
 use crate::highlight::HlCache;
 use crate::lang::{self, Language};
@@ -29,6 +30,14 @@ impl Selection {
     pub fn is_empty(&self) -> bool {
         self.anchor == self.head
     }
+}
+
+/// Cursor state of one view (editor pane) onto a document.
+#[derive(Clone, Copy, Debug, Default)]
+struct ViewState {
+    sel: Selection,
+    preferred_col: Option<usize>,
+    scroll_to_cursor: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -109,6 +118,11 @@ pub struct Document {
     pub disk_base: Option<DiskStamp>,
     /// What the file on disk looked like when last checked.
     pub disk_seen: Option<DiskStamp>,
+    /// The view whose cursor is currently in `sel`, `preferred_col` and
+    /// `scroll_to_cursor` (0: none yet).
+    view: u64,
+    /// Cursors of the document's other views, kept in place as text changes.
+    parked: Vec<(u64, ViewState)>,
     undo: Vec<Transaction>,
     redo: Vec<Transaction>,
     next_tx_id: u64,
@@ -142,6 +156,8 @@ impl Document {
             scroll_to_cursor: false,
             disk_base: None,
             disk_seen: None,
+            view: 0,
+            parked: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
             next_tx_id: 1,
@@ -253,6 +269,46 @@ impl Document {
         self.edit(EditKind::Other, vec![(start, old_end, middle)], after);
         self.scroll_to_cursor = scroll;
         true
+    }
+
+    // ------------------------------------------------------------------
+    // Views (split panes)
+    // ------------------------------------------------------------------
+
+    /// Make `view`'s cursor the current one (`sel` etc.), parking the
+    /// previous view's. A view seen for the first time starts with a copy of
+    /// the current cursor, like a new split in VSCode.
+    pub fn focus_view(&mut self, view: u64) {
+        if self.view == view {
+            return;
+        }
+        let current = ViewState {
+            sel: self.sel,
+            preferred_col: self.preferred_col,
+            scroll_to_cursor: self.scroll_to_cursor,
+        };
+        let next = match self.parked.iter().position(|(v, _)| *v == view) {
+            Some(i) => self.parked.swap_remove(i).1,
+            None => ViewState {
+                scroll_to_cursor: true,
+                ..current
+            },
+        };
+        if self.view != 0 {
+            self.parked.push((self.view, current));
+        }
+        self.view = view;
+        self.sel = next.sel;
+        self.preferred_col = next.preferred_col;
+        self.scroll_to_cursor = next.scroll_to_cursor;
+    }
+
+    /// Forget a closed view's cursor.
+    pub fn drop_view(&mut self, view: u64) {
+        self.parked.retain(|(v, _)| *v != view);
+        if self.view == view {
+            self.view = 0;
+        }
     }
 
     pub fn title(&self) -> String {
@@ -404,6 +460,13 @@ impl Document {
         self.lsp_dirty = true;
         let inserted_len = text.chars().count();
         shift_diagnostics(&mut self.diagnostics, start, end - start, inserted_len);
+        for (_, v) in &mut self.parked {
+            let map = |p| shift_pos(p, start, end - start, inserted_len);
+            v.sel = Selection {
+                anchor: map(v.sel.anchor),
+                head: map(v.sel.head),
+            };
+        }
         Change {
             pos: start,
             removed,
@@ -1051,16 +1114,20 @@ fn detect_tabs(text: &str) -> Option<bool> {
     }
 }
 
+/// Where position `p` ends up after replacing `removed` chars at `pos` with
+/// `inserted` chars. Positions inside the replaced range move to its start.
+fn shift_pos(p: usize, pos: usize, removed: usize, inserted: usize) -> usize {
+    if p >= pos + removed {
+        p - removed + inserted
+    } else if p > pos {
+        pos
+    } else {
+        p
+    }
+}
+
 fn shift_diagnostics(diags: &mut [Diagnostic], pos: usize, removed: usize, inserted: usize) {
-    let map = |p: usize| -> usize {
-        if p >= pos + removed {
-            p - removed + inserted
-        } else if p > pos {
-            pos
-        } else {
-            p
-        }
-    };
+    let map = |p| shift_pos(p, pos, removed, inserted);
     for d in diags {
         d.start = map(d.start);
         d.end = map(d.end).max(d.start);
@@ -1233,5 +1300,30 @@ mod tests {
         assert_eq!(d.word_right(7), 11);
         assert_eq!(d.word_left(11), 8);
         assert_eq!(d.word_at(5), (4, 7));
+    }
+
+    #[test]
+    fn views_keep_their_own_cursors() {
+        let mut d = doc("one\ntwo\n");
+        d.focus_view(1);
+        d.set_cursor(4, false); // start of "two"
+        d.focus_view(2);
+        assert_eq!(d.sel.head, 4, "a new view starts where the current one is");
+        d.set_cursor(0, false);
+        d.insert("zero\n");
+        assert_eq!(d.sel.head, 5);
+        d.focus_view(1);
+        assert_eq!(d.sel.head, 9, "the other view's cursor follows the edit");
+        assert_eq!(d.line_text(d.line_of(d.sel.head)), "two");
+        // Undo in view 1 moves view 2's parked cursor back too.
+        d.undo();
+        d.focus_view(2);
+        assert_eq!(d.sel.head, 0);
+        d.set_cursor(3, false);
+        d.focus_view(1);
+        d.set_cursor(1, false);
+        d.drop_view(2);
+        d.focus_view(2);
+        assert_eq!(d.sel.head, 1, "a dropped view is forgotten");
     }
 }

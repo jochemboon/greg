@@ -8,6 +8,11 @@ linters yourself.
 - Starts instantly, uses no CPU when idle (it only repaints on input).
 - A 12 MB static-ish binary with syntax grammars and themes built in.
 - Lint diagnostics as squiggles, gutter markers, hover tooltips and a Problems panel.
+- Split the editor like VSCode: `Ctrl+\` splits right, `Ctrl+Shift+\` splits down
+  (or use the split buttons on each tab bar, or **View > Editor Layout**). Each pane
+  has its own tabs; a file open in two panes shares one buffer but keeps a cursor and
+  scroll position per pane. Drag a tab onto another pane to move it, or onto a pane's
+  edge to split there. Drag the dividers to resize them (double-click one to even it out).
 - Like VSCode, open files that change on disk (git, formatters, other editors) reload
   automatically. The reload can be undone with `Ctrl+Z`. A tab with unsaved changes
   keeps your edits, and saving it asks whether to overwrite the newer file.
@@ -81,13 +86,15 @@ change. `slate --print-default-config` shows everything, and
 | `F8` / `Shift+F8` next/prev problem | `Ctrl+J` panel · `Ctrl+B` sidebar |
 | `Ctrl+/` toggle comment | `Alt+↑/↓` move line · `Shift+Alt+↑/↓` copy line · `Ctrl+Shift+K` delete line |
 | `Tab` / `Shift+Tab` indent/outdent | `Ctrl+Tab`, `Ctrl+PgUp/PgDn` switch tabs · `Ctrl+W` close |
+| `Ctrl+\` / `Ctrl+Shift+\` split right / down | `Ctrl+1`…`Ctrl+9` focus editor group 1…9 |
 | `Ctrl+C`/`Ctrl+X` with no selection copy/cut the line | `Ctrl+=`/`Ctrl+-` zoom |
 
 ## Layout
 
 ```
 src/main.rs        CLI + window setup
-src/app.rs         shell: file tree, tabs, panels, dialogs, shortcuts
+src/app.rs         shell: file tree, editor groups and tabs, panels, dialogs, shortcuts
+src/layout.rs      editor groups (split panes): the split tree, tab moves, resizing
 src/editor.rs      text widget: virtualised rendering, input, squiggles
 src/buffer.rs      rope document, selection, undo/redo, edit commands
 src/highlight.rs   incremental syntect highlighting (TextMate grammars)

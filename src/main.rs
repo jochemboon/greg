@@ -8,6 +8,7 @@ mod editor;
 mod highlight;
 mod install;
 mod lang;
+mod layout;
 mod lsp;
 mod watch;
 
