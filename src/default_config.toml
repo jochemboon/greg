@@ -1,0 +1,115 @@
+# Slate configuration.
+#
+# Your own file lives at ~/.config/slate/config.toml and is merged over these
+# defaults, so you only need to write the keys you want to change, e.g.
+#
+#   font_size = 15
+#   [language_servers.eslint]
+#   enabled = false
+
+font_size = 14.0
+tab_size = 4
+insert_spaces = true
+# Any bundled theme (`slate --list-themes`), e.g. "OneHalfDark", "OneHalfLight",
+# "Dracula", "Nord", "Monokai Extended", "GitHub", "Solarized (dark)".
+theme = "OneHalfDark"
+# Directories hidden from the file tree and quick-open.
+exclude_dirs = [".git", "node_modules", "target", ".venv", "__pycache__", "dist", "build", ".next"]
+
+# ---------------------------------------------------------------------------
+# Language servers
+#
+# Linting comes from the Language Server Protocol, i.e. the same servers that
+# power VSCode's extensions. ESLint/JSON/CSS/HTML are VSCode's own servers,
+# published standalone as `vscode-langservers-extracted`.
+#
+# You don't need Node or npm: servers with an `npm` (or `download`) entry can
+# be installed by Slate itself, into ~/.local/share/slate, with a private
+# Node.js runtime. Click "Install" next to the server in the status bar, use
+# View > Language Servers, or run `slate --install eslint json css ...`.
+#
+# Commands are looked up in the project's node_modules/.bin first, then
+# Slate's own installs, then PATH.
+#
+# `settings` is what VSCode would send as the workspace configuration
+# (`workspace/configuration` and `workspace/didChangeConfiguration`).
+# ---------------------------------------------------------------------------
+
+[language_servers.eslint]
+command = "vscode-eslint-language-server"
+args = ["--stdio"]
+npm = ["vscode-langservers-extracted"]
+languages = ["javascript", "javascriptreact", "typescript", "typescriptreact", "vue", "svelte"]
+
+[language_servers.eslint.settings]
+validate = "on"
+run = "onType"
+nodePath = ""
+rulesCustomizations = []
+experimental = {}
+problems = { shortenToSingleLine = false }
+workingDirectory = { mode = "auto" }
+codeAction = { disableRuleComment = { enable = true, location = "separateLine" }, showDocumentation = { enable = true } }
+
+[language_servers.typescript]
+command = "typescript-language-server"
+args = ["--stdio"]
+npm = ["typescript@5", "typescript-language-server"]
+languages = ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+
+# TypeScript 7+ (the native compiler) has a built-in language server. If your
+# projects use it, enable this one and disable `typescript` above.
+[language_servers.typescript-native]
+command = "tsc"
+args = ["--lsp", "--stdio"]
+npm = ["typescript@7"]
+languages = ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+enabled = false
+
+[language_servers.json]
+command = "vscode-json-language-server"
+args = ["--stdio"]
+npm = ["vscode-langservers-extracted"]
+languages = ["json", "jsonc"]
+initialization_options = { provideFormatter = true }
+settings = { json = { validate = { enable = true } } }
+
+[language_servers.css]
+command = "vscode-css-language-server"
+args = ["--stdio"]
+npm = ["vscode-langservers-extracted"]
+languages = ["css", "scss", "less"]
+initialization_options = { provideFormatter = true }
+
+[language_servers.css.settings]
+css = { validate = true }
+scss = { validate = true }
+less = { validate = true }
+
+[language_servers.html]
+command = "vscode-html-language-server"
+args = ["--stdio"]
+npm = ["vscode-langservers-extracted"]
+languages = ["html"]
+initialization_options = { provideFormatter = true }
+
+[language_servers.pyright]
+command = "pyright-langserver"
+args = ["--stdio"]
+npm = ["pyright"]
+languages = ["python"]
+settings = { python = { analysis = { autoSearchPaths = true, useLibraryCodeForTypes = true, diagnosticMode = "openFilesOnly" } } }
+
+[language_servers.rust-analyzer]
+command = "rust-analyzer"
+download = "https://github.com/rust-lang/rust-analyzer/releases/latest/download/rust-analyzer-{target}.gz"
+languages = ["rust"]
+
+# gopls and clangd: install with your package manager / `go install`.
+[language_servers.gopls]
+command = "gopls"
+languages = ["go"]
+
+[language_servers.clangd]
+command = "clangd"
+languages = ["c", "cpp"]
