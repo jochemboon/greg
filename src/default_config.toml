@@ -10,9 +10,10 @@
 font_size = 14.0
 tab_size = 4
 insert_spaces = true
-# Any bundled theme (`slate --list-themes`), e.g. "OneHalfDark", "OneHalfLight",
-# "Dracula", "Nord", "Monokai Extended", "GitHub", "Solarized (dark)".
-theme = "OneHalfDark"
+# Any bundled theme (`slate --list-themes`). "AAP-64" (built from the AAP-64
+# pixel-art palette) also colours the UI; others include "OneHalfDark",
+# "OneHalfLight", "Dracula", "Nord", "Monokai Extended", "GitHub", "Solarized (dark)".
+theme = "AAP-64"
 # Directories hidden from the file tree and quick-open.
 exclude_dirs = [".git", "node_modules", "target", ".venv", "__pycache__", "dist", "build", ".next"]
 

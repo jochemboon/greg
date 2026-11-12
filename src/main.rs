@@ -1,6 +1,7 @@
 //! Slate — a lightweight code editor that reuses VSCode's linters through the
 //! Language Server Protocol.
 
+mod aap64;
 mod app;
 mod buffer;
 mod config;

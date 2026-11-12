@@ -23,6 +23,8 @@ pub struct Span {
 pub struct Highlighter {
     ss: SyntaxSet,
     pub theme: Theme,
+    /// The built-in AAP-64 scheme is in use (it also colours the UI).
+    aap64: bool,
 }
 
 pub struct ThemeColors {
@@ -32,6 +34,33 @@ pub struct ThemeColors {
     pub line_highlight: Color32,
     pub gutter_fg: Color32,
     pub caret: Color32,
+    /// Marks the focused editor group and hovered dividers.
+    pub accent: Color32,
+    pub find_match: Color32,
+    pub error: Color32,
+    pub warning: Color32,
+    pub info: Color32,
+    pub hint: Color32,
+    /// UI colours; `None` derives them from the editor background.
+    pub ui: Option<UiPalette>,
+}
+
+/// Colours for the UI around the editor (panels, menus, buttons).
+pub struct UiPalette {
+    /// Menu bar, sidebar, tab bars, status bar, popups.
+    pub panel: Color32,
+    /// Text field backgrounds.
+    pub deep: Color32,
+    pub border: Color32,
+    pub widget: Color32,
+    pub widget_hover: Color32,
+    pub widget_active: Color32,
+    /// Striped rows.
+    pub faint: Color32,
+    pub text: Color32,
+    pub strong_text: Color32,
+    /// Selected tabs and list items, selected text in fields.
+    pub selection: Color32,
 }
 
 fn c32(c: syntect::highlighting::Color) -> Color32 {
@@ -40,6 +69,19 @@ fn c32(c: syntect::highlighting::Color) -> Color32 {
 
 impl Highlighter {
     pub fn new(theme_name: &str) -> Self {
+        let simple = |s: &str| {
+            s.chars()
+                .filter(char::is_ascii_alphanumeric)
+                .collect::<String>()
+                .to_ascii_lowercase()
+        };
+        if simple(theme_name) == simple(crate::aap64::NAME) {
+            return Self {
+                ss: two_face::syntax::extra_newlines(),
+                theme: crate::aap64::theme(),
+                aap64: true,
+            };
+        }
         let themes: EmbeddedLazyThemeSet = two_face::theme::extra();
         let wanted = theme_name.to_ascii_lowercase();
         let name = EmbeddedLazyThemeSet::theme_names()
@@ -50,13 +92,17 @@ impl Highlighter {
         Self {
             ss: two_face::syntax::extra_newlines(),
             theme: themes.get(name).clone(),
+            aap64: false,
         }
     }
 
     pub fn theme_names() -> Vec<&'static str> {
-        EmbeddedLazyThemeSet::theme_names()
-            .iter()
-            .map(|n| n.as_name())
+        std::iter::once(crate::aap64::NAME)
+            .chain(
+                EmbeddedLazyThemeSet::theme_names()
+                    .iter()
+                    .map(|n| n.as_name()),
+            )
             .collect()
     }
 
@@ -70,7 +116,7 @@ impl Highlighter {
             .foreground
             .map(c32)
             .unwrap_or(Color32::from_rgb(212, 212, 212));
-        ThemeColors {
+        let mut colors = ThemeColors {
             background,
             foreground,
             selection: s
@@ -86,7 +132,21 @@ impl Highlighter {
                 .map(c32)
                 .unwrap_or(foreground.gamma_multiply(0.45)),
             caret: s.caret.map(c32).unwrap_or(foreground),
+            accent: s
+                .accent
+                .map(c32)
+                .unwrap_or(Color32::from_rgb(0x37, 0x94, 0xff)),
+            find_match: Color32::from_rgba_unmultiplied(234, 92, 0, 70),
+            error: Color32::from_rgb(0xf1, 0x4c, 0x4c),
+            warning: Color32::from_rgb(0xcc, 0xa7, 0x00),
+            info: Color32::from_rgb(0x37, 0x94, 0xff),
+            hint: Color32::from_rgb(0x8a, 0x8a, 0x8a),
+            ui: None,
+        };
+        if self.aap64 {
+            crate::aap64::adjust(&mut colors);
         }
+        colors
     }
 
     /// Pick a grammar for the file and reset the cache if it changed.

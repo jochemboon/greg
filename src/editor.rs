@@ -8,23 +8,23 @@ use eframe::egui::{
     Shape, Stroke, TextFormat, Ui, Vec2, text::LayoutJob,
 };
 
-pub fn severity_color(s: Severity) -> Color32 {
+pub fn severity_color(c: &ThemeColors, s: Severity) -> Color32 {
     match s {
-        Severity::Error => Color32::from_rgb(0xf1, 0x4c, 0x4c),
-        Severity::Warning => Color32::from_rgb(0xcc, 0xa7, 0x00),
-        Severity::Info => Color32::from_rgb(0x37, 0x94, 0xff),
-        Severity::Hint => Color32::from_rgb(0x8a, 0x8a, 0x8a),
+        Severity::Error => c.error,
+        Severity::Warning => c.warning,
+        Severity::Info => c.info,
+        Severity::Hint => c.hint,
     }
 }
 
 /// Paint a small severity icon (circle for errors, triangle for warnings…).
 /// Painted rather than drawn from a font so no emoji font is needed.
-pub fn severity_icon(ui: &mut Ui, severity: Severity) -> egui::Response {
+pub fn severity_icon(ui: &mut Ui, colors: &ThemeColors, severity: Severity) -> egui::Response {
     let size = ui.text_style_height(&egui::TextStyle::Body);
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
     let c = rect.center();
     let r = size * 0.32;
-    let color = severity_color(severity);
+    let color = severity_color(colors, severity);
     match severity {
         Severity::Warning => {
             let pts = vec![
@@ -174,7 +174,7 @@ pub fn editor_ui(ui: &mut Ui, doc: &mut Document, id: Id, p: &EditorParams) {
                         ui.set_max_width(600.0);
                         for d in hits {
                             ui.horizontal_wrapped(|ui| {
-                                severity_icon(ui, d.severity);
+                                severity_icon(ui, p.colors, d.severity);
                                 ui.label(&d.message);
                                 if !d.source.is_empty() {
                                     ui.weak(&d.source);
@@ -264,7 +264,7 @@ fn paint(
                 painter.rect_filled(
                     Rect::from_min_max(Pos2::new(x1, y), Pos2::new(x2.max(x1 + 2.0), y + line_h)),
                     2.0,
-                    Color32::from_rgba_unmultiplied(234, 92, 0, 70),
+                    c.find_match,
                 );
             }
         }
@@ -313,7 +313,7 @@ fn paint(
         if dl2 < first || dl1 > last {
             continue;
         }
-        let color = severity_color(d.severity);
+        let color = severity_color(c, d.severity);
         for line in dl1.max(first)..=dl2.min(last) {
             let ls = doc.line_start(line);
             let le = doc.line_end(line);
@@ -393,7 +393,7 @@ fn paint(
             painter.rect_filled(
                 Rect::from_min_size(Pos2::new(gx + 3.0, y + 3.0), Vec2::new(3.0, line_h - 6.0)),
                 1.0,
-                severity_color(sev),
+                severity_color(c, sev),
             );
         }
     }

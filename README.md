@@ -75,7 +75,9 @@ settings = { yaml = { validate = true } }   # what VSCode would send as settings
 `Ctrl+,` opens `~/.config/slate/config.toml`. Saving it applies changes
 immediately. It's merged over the built-in defaults, so only write what you
 change. `slate --print-default-config` shows everything, and
-`slate --list-themes` lists themes.
+`slate --list-themes` lists themes. The default, `AAP-64`, is built only from
+the colours of the [AAP-64](https://lospec.com/palette-list/aap-64) pixel-art
+palette and colours the whole UI, not just the code.
 
 ## Keys
 
@@ -101,6 +103,7 @@ src/highlight.rs   incremental syntect highlighting (TextMate grammars)
 src/lsp.rs         LSP client: push + pull diagnostics, UTF-8/16 positions
 src/watch.rs       background poller that spots open files changing on disk
 src/config.rs      settings loading/merging; defaults in default_config.toml
+src/aap64.rs       the built-in AAP-64 colour scheme
 src/install.rs     managed installs: private Node.js + npm servers, binary downloads
 ```
 

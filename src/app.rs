@@ -1161,7 +1161,7 @@ impl App {
                             }
                             let mut text = RichText::new(&label);
                             if has_err {
-                                text = text.color(severity_color(Severity::Error));
+                                text = text.color(severity_color(&self.colors, Severity::Error));
                             }
                             if deleted {
                                 text = text.strikethrough();
@@ -1246,8 +1246,7 @@ impl App {
         if several && focused {
             // Mark the focused group, as VSCode does with its tab accent.
             let line = egui::Rect::from_min_size(bar.min, egui::vec2(bar.width(), 2.0));
-            ui.painter()
-                .rect_filled(line, 0.0, ui.visuals().selection.stroke.color);
+            ui.painter().rect_filled(line, 0.0, self.colors.accent);
         }
         if focused && self.find.open {
             egui::Frame::NONE
@@ -1322,7 +1321,7 @@ impl App {
 
         // Dividers, registered after the editors so they win the hit test.
         let line_color = ui.visuals().widgets.noninteractive.bg_stroke.color;
-        let hot_color = ui.visuals().selection.stroke.color;
+        let hot_color = self.colors.accent;
         for s in &splitters {
             let hit = match s.axis {
                 Axis::Row => s.line.expand2(egui::vec2(2.0, 0.0)),
@@ -1427,10 +1426,10 @@ impl App {
             let r = ui
                 .scope(|ui| {
                     ui.spacing_mut().item_spacing.x = 3.0;
-                    severity_icon(ui, Severity::Error);
+                    severity_icon(ui, &self.colors, Severity::Error);
                     ui.label(errors.to_string());
                     ui.add_space(4.0);
-                    severity_icon(ui, Severity::Warning);
+                    severity_icon(ui, &self.colors, Severity::Warning);
                     ui.label(warnings.to_string());
                 })
                 .response
@@ -1581,11 +1580,14 @@ impl App {
                         .min()
                         .unwrap_or(3);
                     if worst <= Severity::Warning as u8 {
-                        text = text.color(severity_color(if worst == 0 {
-                            Severity::Error
-                        } else {
-                            Severity::Warning
-                        }));
+                        text = text.color(severity_color(
+                            &self.colors,
+                            if worst == 0 {
+                                Severity::Error
+                            } else {
+                                Severity::Warning
+                            },
+                        ));
                     }
                 }
                 if ui
@@ -1635,7 +1637,7 @@ impl App {
                                 .show(ui, |ui| {
                                     for (enc, d) in items {
                                         let r = ui.horizontal(|ui| {
-                                            severity_icon(ui, d.severity);
+                                            severity_icon(ui, &self.colors, d.severity);
                                             let r = ui.add(
                                                 egui::Label::new(
                                                     d.message.lines().next().unwrap_or(""),
@@ -1876,7 +1878,7 @@ impl App {
                 let r = ui.add(TextEdit::singleline(text).desired_width(f32::INFINITY));
                 r.request_focus();
                 if let Some(e) = error {
-                    ui.colored_label(severity_color(Severity::Error), e.as_str());
+                    ui.colored_label(severity_color(&self.colors, Severity::Error), e.as_str());
                 }
                 ui.horizontal(|ui| {
                     let ok = ui.button("OK").clicked() || ui.input(|i| i.key_pressed(Key::Enter));
@@ -2166,6 +2168,40 @@ fn apply_visuals(ctx: &egui::Context, c: &ThemeColors) {
     v.panel_fill = Color32::from_rgb(shift(bg.r(), d), shift(bg.g(), d), shift(bg.b(), d));
     v.window_fill = v.panel_fill;
     v.extreme_bg_color = bg;
+    v.hyperlink_color = c.accent;
+    v.warn_fg_color = c.warning;
+    v.error_fg_color = c.error;
+    if let Some(p) = &c.ui {
+        v.panel_fill = p.panel;
+        v.window_fill = p.panel;
+        v.window_stroke.color = p.border;
+        v.extreme_bg_color = p.deep;
+        v.text_edit_bg_color = Some(p.deep);
+        v.code_bg_color = p.deep;
+        v.faint_bg_color = p.faint;
+        v.selection.bg_fill = p.selection;
+        v.selection.stroke.color = p.strong_text;
+        let w = &mut v.widgets;
+        w.noninteractive.bg_fill = p.panel;
+        w.noninteractive.weak_bg_fill = p.panel;
+        w.noninteractive.bg_stroke.color = p.border;
+        w.noninteractive.fg_stroke.color = p.text;
+        for (state, fill) in [
+            (&mut w.inactive, p.widget),
+            (&mut w.hovered, p.widget_hover),
+            (&mut w.active, p.widget_active),
+            (&mut w.open, p.widget_hover),
+        ] {
+            state.bg_fill = fill;
+            state.weak_bg_fill = fill;
+        }
+        w.inactive.fg_stroke.color = p.text;
+        w.hovered.fg_stroke.color = p.strong_text;
+        w.active.fg_stroke.color = p.strong_text;
+        w.open.fg_stroke.color = p.strong_text;
+        w.hovered.bg_stroke.color = p.border;
+        w.active.bg_stroke.color = p.border;
+    }
     ctx.set_visuals(v);
 }
 
