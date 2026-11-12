@@ -1483,7 +1483,7 @@ impl App {
                         && ui
                             .small_button("Install")
                             .on_hover_text(format!(
-                                "Download {name} into ~/.local/share/slate (no system Node/npm needed)"
+                                "Download {name} into ~/.local/share/greg (no system Node/npm needed)"
                             ))
                             .clicked()
                     {
@@ -2118,17 +2118,17 @@ impl eframe::App for App {
         // Window title.
         let title = match self.active_doc() {
             Some(d) => format!(
-                "{}{} — Slate",
+                "{}{} — Greg",
                 if d.is_dirty() { "● " } else { "" },
                 d.title()
             ),
-            None => "Slate".to_string(),
+            None => "Greg".to_string(),
         };
         let title = match &self.root {
             Some(r) => title.replacen(
-                " — Slate",
+                " — Greg",
                 &format!(
-                    " — {} — Slate",
+                    " — {} — Greg",
                     r.file_name().unwrap_or_default().to_string_lossy()
                 ),
                 1,
@@ -2151,11 +2151,11 @@ impl eframe::App for App {
 // ----------------------------------------------------------------------------
 
 const USER_CONFIG_TEMPLATE: &str = "\
-# Slate user settings. This file is merged over the built-in defaults;
-# run `slate --print-default-config` to see every option and the
+# Greg user settings. This file is merged over the built-in defaults;
+# run `greg --print-default-config` to see every option and the
 # preconfigured language servers. Saving this file reloads it.
 
-# font_family = \"JetBrains Mono\"   # `slate --list-fonts` lists monospaced fonts
+# font_family = \"JetBrains Mono\"   # `greg --list-fonts` lists monospaced fonts
 # font_size = 14.0
 # line_height = 1.35
 # ui_font_family = \"Inter\"
@@ -2425,7 +2425,7 @@ mod tests {
 
     fn harness_with(text: &str) -> (Harness<'static, App>, PathBuf) {
         let dir =
-            std::env::temp_dir().join(format!("slate-ui-{}-{}", std::process::id(), rand_suffix()));
+            std::env::temp_dir().join(format!("greg-ui-{}-{}", std::process::id(), rand_suffix()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("notes.txt");
         std::fs::write(&file, text).unwrap();
@@ -2664,16 +2664,16 @@ mod tests {
     /// Full GUI flow with no Node anywhere: open a JSON file, click
     /// "Install" in the status bar, and wait for the freshly installed
     /// server's diagnostics. Downloads Node, so it's ignored by default:
-    /// `SLATE_TEST_DATA_DIR=/empty/dir cargo test gui_install -- --ignored`
+    /// `GREG_TEST_DATA_DIR=/empty/dir cargo test gui_install -- --ignored`
     #[test]
     #[ignore]
     fn gui_install_flow() {
         use egui_kittest::kittest::Queryable;
-        let data = std::env::var_os("SLATE_TEST_DATA_DIR").expect("set SLATE_TEST_DATA_DIR");
+        let data = std::env::var_os("GREG_TEST_DATA_DIR").expect("set GREG_TEST_DATA_DIR");
         // SAFETY: this ignored test runs on its own; nothing else reads the env concurrently.
         unsafe { std::env::set_var("XDG_DATA_HOME", data) };
 
-        let dir = std::env::temp_dir().join(format!("slate-gui-install-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("greg-gui-install-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("bad.json");
         std::fs::write(&file, "{\n  \"a\": 1,\n  \"b\": \n}\n").unwrap();

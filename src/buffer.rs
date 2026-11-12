@@ -1191,7 +1191,7 @@ mod tests {
 
     #[test]
     fn reload_is_undoable_and_clean() {
-        let path = std::env::temp_dir().join(format!("slate-reload-{}.txt", std::process::id()));
+        let path = std::env::temp_dir().join(format!("greg-reload-{}.txt", std::process::id()));
         std::fs::write(&path, "one\n").unwrap();
         let mut d = Document::open(&path, 4, true).unwrap();
         assert!(!d.disk_changed());

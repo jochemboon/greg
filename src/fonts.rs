@@ -77,7 +77,7 @@ pub fn load(spec: &str, mono: bool) -> Result<FontData, String> {
 /// Make sure the font can be read and has what the editor needs.
 fn check(bytes: &[u8], index: u32, mono: bool) -> Result<(), String> {
     let font = skrifa::FontRef::from_index(bytes, index)
-        .map_err(|_| "isn't a font file Slate can read (use .ttf, .otf or .ttc)".to_string())?;
+        .map_err(|_| "isn't a font file Greg can read (use .ttf, .otf or .ttc)".to_string())?;
     let charmap = font.charmap();
     let metrics = font.glyph_metrics(Size::unscaled(), LocationRef::default());
     let advances: Vec<Option<f32>> = ['M', 'i', 'W', '.', ' ']
@@ -94,7 +94,7 @@ fn check(bytes: &[u8], index: u32, mono: bool) -> Result<(), String> {
             .any(|&a| a != advances[0].unwrap())
     {
         return Err("isn't monospaced, which the editor needs \
-                    (`slate --list-fonts` lists monospaced fonts)"
+                    (`greg --list-fonts` lists monospaced fonts)"
             .into());
     }
     Ok(())
@@ -139,7 +139,7 @@ fn parse_match(spec: &str, out: &str) -> Result<(PathBuf, u32), String> {
     if !families.split(',').any(|f| simplify(f) == wanted) {
         return Err(format!(
             "isn't installed (the closest match is \"{}\"); \
-             `slate --list-fonts` lists the monospaced fonts you have",
+             `greg --list-fonts` lists the monospaced fonts you have",
             families.split(',').next().unwrap_or(families)
         ));
     }
@@ -153,7 +153,7 @@ fn simplify(name: &str) -> String {
         .collect()
 }
 
-/// Families of the installed monospaced fonts, for `slate --list-fonts`.
+/// Families of the installed monospaced fonts, for `greg --list-fonts`.
 pub fn list_monospace() -> Result<Vec<String>, String> {
     let out = Command::new("fc-list")
         .args([
@@ -188,7 +188,7 @@ mod tests {
     /// Write one of egui's bundled fonts to a temp file.
     fn bundled(name: &str) -> PathBuf {
         let defs = FontDefinitions::default();
-        let dir = std::env::temp_dir().join(format!("slate-fonts-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("greg-fonts-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         // A file per call: tests run in parallel.
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -214,7 +214,7 @@ mod tests {
                 .unwrap_err()
                 .contains("doesn't exist")
         );
-        let junk = std::env::temp_dir().join(format!("slate-junk-{}.ttf", std::process::id()));
+        let junk = std::env::temp_dir().join(format!("greg-junk-{}.ttf", std::process::id()));
         std::fs::write(&junk, b"not a font").unwrap();
         assert!(
             load(&junk.display().to_string(), true)

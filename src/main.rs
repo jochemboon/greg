@@ -1,4 +1,4 @@
-//! Slate — a lightweight code editor that reuses VSCode's linters through the
+//! Greg — a lightweight code editor that reuses VSCode's linters through the
 //! Language Server Protocol.
 
 mod aap64;
@@ -18,10 +18,10 @@ mod watch;
 use std::path::PathBuf;
 
 const HELP: &str = "\
-slate — a lightweight code editor
+greg — a lightweight code editor
 
 USAGE:
-    slate [FOLDER | FILE...]
+    greg [FOLDER | FILE...]
 
 OPTIONS:
     --print-default-config   Print the built-in configuration and exit
@@ -30,12 +30,13 @@ OPTIONS:
     --list-servers           Show configured language servers
     --install SERVER...      Install language servers (e.g. eslint json css html
                              typescript pyright rust-analyzer) into
-                             ~/.local/share/slate; no system Node/npm needed
+                             ~/.local/share/greg; no system Node/npm needed
     -h, --help               Show this help
     -V, --version            Show version
 ";
 
 fn main() -> eframe::Result {
+    migrate_from_slate();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) == Some("--install") {
         std::process::exit(install_cli(&args[1..]));
@@ -49,7 +50,7 @@ fn main() -> eframe::Result {
                 return Ok(());
             }
             "-V" | "--version" => {
-                println!("slate {}", env!("CARGO_PKG_VERSION"));
+                println!("greg {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             "--print-default-config" => {
@@ -100,13 +101,13 @@ fn main() -> eframe::Result {
 
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Slate")
-            .with_app_id("slate")
+            .with_title("Greg")
+            .with_app_id("greg")
             .with_inner_size([1200.0, 800.0]),
         ..Default::default()
     };
     eframe::run_native(
-        "slate",
+        "greg",
         options,
         Box::new(move |cc| Ok(Box::new(app::App::new(cc, root, files)))),
     )
@@ -118,13 +119,13 @@ fn install_cli(names: &[String]) -> i32 {
         eprintln!("config error: {e}");
     }
     if names.is_empty() {
-        eprintln!("usage: slate --install SERVER...   (see `slate --list-servers`)");
+        eprintln!("usage: greg --install SERVER...   (see `greg --list-servers`)");
         return 2;
     }
     let mut failed = 0;
     for name in names {
         let Some(server) = cfg.language_servers.get(name) else {
-            eprintln!("unknown server `{name}` (see `slate --list-servers`)");
+            eprintln!("unknown server `{name}` (see `greg --list-servers`)");
             failed += 1;
             continue;
         };
@@ -135,4 +136,22 @@ fn install_cli(names: &[String]) -> i32 {
         }
     }
     if failed > 0 { 1 } else { 0 }
+}
+
+/// greg used to be called Slate: move its settings and downloaded language
+/// servers to greg's folders the first time greg runs.
+fn migrate_from_slate() {
+    let new_dirs = [
+        config::config_path().parent().map(PathBuf::from),
+        Some(install::data_dir()),
+    ];
+    for new in new_dirs.into_iter().flatten() {
+        let old = new.with_file_name("slate");
+        if old.is_dir() && !new.exists() {
+            match std::fs::rename(&old, &new) {
+                Ok(()) => eprintln!("moved {} to {}", old.display(), new.display()),
+                Err(e) => eprintln!("couldn't move {} to {}: {e}", old.display(), new.display()),
+            }
+        }
+    }
 }

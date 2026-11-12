@@ -1,6 +1,6 @@
 //! Minimal Language Server Protocol client.
 //!
-//! This is how Slate reuses VSCode's linters: VSCode's language features
+//! This is how Greg reuses VSCode's linters: VSCode's language features
 //! (ESLint, the JSON/CSS/HTML services, TypeScript, Pylance's core pyright…)
 //! are LSP servers, so any editor speaking LSP gets the same diagnostics.
 //!
@@ -146,7 +146,7 @@ impl LspClient {
         ctx: egui::Context,
     ) -> Result<Self, Failure> {
         // Project-local install first (like VSCode's "use workspace version"),
-        // then Slate's managed install, then PATH.
+        // then Greg's managed install, then PATH.
         let program = crate::install::resolve_command(cfg, root);
         let mut child = Command::new(&program)
             .args(&cfg.args)
@@ -201,7 +201,7 @@ impl LspClient {
             "method": "initialize",
             "params": {
                 "processId": std::process::id(),
-                "clientInfo": { "name": "slate", "version": env!("CARGO_PKG_VERSION") },
+                "clientInfo": { "name": "greg", "version": env!("CARGO_PKG_VERSION") },
                 "rootUri": root_uri,
                 "rootPath": root.to_string_lossy(),
                 "workspaceFolders": [{ "uri": root_uri, "name": root_name }],
@@ -312,10 +312,10 @@ impl LspClient {
     }
 }
 
-/// Set `SLATE_LSP_TRACE=1` to print all JSON-RPC traffic to stderr.
+/// Set `GREG_LSP_TRACE=1` to print all JSON-RPC traffic to stderr.
 fn trace_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("SLATE_LSP_TRACE").is_some())
+    *ON.get_or_init(|| std::env::var_os("GREG_LSP_TRACE").is_some())
 }
 
 fn truncate_for_trace(s: &str) -> &str {
@@ -750,7 +750,7 @@ impl LspManager {
                     let message = match &e {
                         Failure::NotInstalled => {
                             let hint = if crate::install::can_install(&self.configs[name]) {
-                                "click Install in the status bar or run `slate --install`"
+                                "click Install in the status bar or run `greg --install`"
                             } else {
                                 "install it and make sure it's on PATH"
                             };
@@ -1045,7 +1045,7 @@ mod integration {
     #[test]
     #[ignore]
     fn rust_analyzer_reports_diagnostics() {
-        let dir = std::env::temp_dir().join(format!("slate-ra-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("greg-ra-test-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(
             dir.join("Cargo.toml"),
@@ -1068,14 +1068,14 @@ mod integration {
         );
     }
 
-    /// Needs `vscode-eslint-language-server` on PATH and SLATE_TEST_ESLINT_DIR
+    /// Needs `vscode-eslint-language-server` on PATH and GREG_TEST_ESLINT_DIR
     /// pointing at a project with eslint installed, an eslint.config.js enabling
     /// `eqeqeq`, and an index.js whose 4th line is `const s = "héllo😀"; if (s == 1) {}`.
     #[test]
     #[ignore]
     fn eslint_reports_diagnostics() {
-        let Some(dir) = std::env::var_os("SLATE_TEST_ESLINT_DIR").map(PathBuf::from) else {
-            panic!("set SLATE_TEST_ESLINT_DIR");
+        let Some(dir) = std::env::var_os("GREG_TEST_ESLINT_DIR").map(PathBuf::from) else {
+            panic!("set GREG_TEST_ESLINT_DIR");
         };
         let (doc, enc, diags) = diagnostics_from("eslint", &dir, &dir.join("index.js"));
         assert_eq!(enc, PosEncoding::Utf16);
@@ -1093,15 +1093,15 @@ mod integration {
         assert_eq!(text, "==");
     }
 
-    /// Generic check: SLATE_TEST_SERVER=<config name> SLATE_TEST_FILE=<path>.
+    /// Generic check: GREG_TEST_SERVER=<config name> GREG_TEST_FILE=<path>.
     #[test]
     #[ignore]
     fn configured_server_reports_diagnostics() {
         let (Some(server), Some(file)) = (
-            std::env::var("SLATE_TEST_SERVER").ok(),
-            std::env::var_os("SLATE_TEST_FILE"),
+            std::env::var("GREG_TEST_SERVER").ok(),
+            std::env::var_os("GREG_TEST_FILE"),
         ) else {
-            panic!("set SLATE_TEST_SERVER and SLATE_TEST_FILE");
+            panic!("set GREG_TEST_SERVER and GREG_TEST_FILE");
         };
         let file = PathBuf::from(file);
         let (_, _, diags) = diagnostics_from(&server, file.parent().unwrap(), &file);

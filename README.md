@@ -1,4 +1,4 @@
-# Slate
+# Greg
 
 A lightweight native code editor written in Rust (egui + OpenGL). It reuses
 VSCode's linters by speaking the **Language Server Protocol**, the same
@@ -21,8 +21,8 @@ linters yourself.
 
 ```sh
 cargo build --release        # needs a C compiler (for the Oniguruma regex engine)
-./target/release/slate .     # open the current folder
-./target/release/slate src/main.rs   # or individual files
+./target/release/greg .     # open the current folder
+./target/release/greg src/main.rs   # or individual files
 ```
 
 ## Linters (VSCode's language servers)
@@ -32,13 +32,13 @@ missing, the status bar shows **Install** next to it. Click it, or use
 **View > Language Servers**, or run:
 
 ```sh
-slate --install eslint json css html typescript pyright rust-analyzer
-slate --list-servers
+greg --install eslint json css html typescript pyright rust-analyzer
+greg --list-servers
 ```
 
-Slate downloads a private Node.js runtime (latest LTS from nodejs.org,
+Greg downloads a private Node.js runtime (latest LTS from nodejs.org,
 SHA-256 checked against the official `SHASUMS256.txt`) plus the servers into
-`~/.local/share/slate`. Nothing is installed system-wide, and deleting that
+`~/.local/share/greg`. Nothing is installed system-wide, and deleting that
 folder removes all of it. Downloads use `curl`, `tar` and `gzip`.
 
 | Language | Server | Source |
@@ -53,14 +53,14 @@ folder removes all of it. Downloads use `curl`, `tar` and `gzip`.
 | Go / C / C++ | `gopls` / `clangd` | install yourself (`go install`, `dnf install clang-tools-extra`) |
 
 Each server is looked up in the project's `node_modules/.bin` first, then in
-Slate's own installs, then on `PATH`. If you do install things yourself, they're used
+Greg's own installs, then on `PATH`. If you do install things yourself, they're used
 too.
 
-**Rust note:** Rust diagnostics come from `cargo check`, which Slate runs when you
+**Rust note:** Rust diagnostics come from `cargo check`, which Greg runs when you
 open a file of a Cargo workspace and again on every save. You get the compiler's
 own errors and warnings, and nothing stays in memory between checks.
 rust-analyzer updates as you type, but it indexes every dependency, which is often
-1–2 GB of RAM, mostly for completion and navigation that Slate doesn't have yet.
+1–2 GB of RAM, mostly for completion and navigation that Greg doesn't have yet.
 Only workspaces you have files open in are checked. Use clippy with
 `args = ["clippy", "--workspace", "--all-targets"]` under
 `[language_servers.cargo-check]`, or switch to rust-analyzer with
@@ -69,7 +69,7 @@ for `cargo-check`).
 
 **ESLint note:** as in VSCode, the ESLint server runs *your project's* `eslint`
 package (so your config and plugins apply). The project therefore needs its
-dependencies installed (`node_modules/eslint`). Slate can't do that step for
+dependencies installed (`node_modules/eslint`). Greg can't do that step for
 you, so you need some package manager for JS projects (npm, pnpm, yarn or bun).
 
 Any other LSP server works too. Add it in settings:
@@ -84,10 +84,10 @@ settings = { yaml = { validate = true } }   # what VSCode would send as settings
 
 ## Settings
 
-`Ctrl+,` opens `~/.config/slate/config.toml`. Saving it applies changes
+`Ctrl+,` opens `~/.config/greg/config.toml`. Saving it applies changes
 immediately. It's merged over the built-in defaults, so only write what you
-change. `slate --print-default-config` shows everything, and
-`slate --list-themes` lists themes. The default, `AAP-64`, is built only from
+change. `greg --print-default-config` shows everything, and
+`greg --list-themes` lists themes. The default, `AAP-64`, is built only from
 the colours of the [AAP-64](https://lospec.com/palette-list/aap-64) pixel-art
 palette and colours the whole UI, not just the code.
 
@@ -103,7 +103,7 @@ ui_font_size = 13.0
 
 Give a family name as your system knows it, optionally with a style
 (`"Fira Code:medium"`), or the path of a `.ttf`/`.otf` file. Names are looked
-up with fontconfig, and `slate --list-fonts` lists the monospaced fonts you have.
+up with fontconfig, and `greg --list-fonts` lists the monospaced fonts you have.
 A font that's missing or unusable is reported in the status bar, and the
 built-in font is used instead.
 
@@ -142,8 +142,8 @@ src/install.rs     managed installs: private Node.js + npm servers, binary downl
 ```sh
 cargo test                      # unit + UI tests (egui_kittest)
 cargo test -- --ignored         # also real-server tests (need servers on PATH;
-                                # ESLint needs SLATE_TEST_ESLINT_DIR, see src/lsp.rs)
-SLATE_LSP_TRACE=1 slate .       # dump all JSON-RPC traffic to stderr
+                                # ESLint needs GREG_TEST_ESLINT_DIR, see src/lsp.rs)
+GREG_LSP_TRACE=1 greg .       # dump all JSON-RPC traffic to stderr
 ```
 
 ## Not yet implemented

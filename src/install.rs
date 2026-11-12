@@ -1,6 +1,6 @@
 //! Managed language-server installs, so you don't need Node/npm on your system.
 //!
-//! Everything lives under `~/.local/share/slate`:
+//! Everything lives under `~/.local/share/greg`:
 //!
 //! ```text
 //! node/                     private Node.js runtime (downloaded from nodejs.org, SHA-256 verified)
@@ -9,7 +9,7 @@
 //! ```
 //!
 //! Downloads use `curl`, and archives are unpacked with `tar`/`gzip`. These are
-//! standard on Linux and macOS, so Slate doesn't need an HTTP/TLS stack.
+//! standard on Linux and macOS, so Greg doesn't need an HTTP/TLS stack.
 
 use crate::config::ServerConfig;
 use sha2::{Digest, Sha256};
@@ -23,7 +23,7 @@ pub fn data_dir() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("slate")
+        .join("greg")
 }
 
 fn node_dir() -> PathBuf {
@@ -61,7 +61,7 @@ fn npm_prefix(packages: &[String]) -> PathBuf {
 }
 
 /// Pick the executable for a server, most specific first:
-/// project `node_modules/.bin`, Slate-managed install, then `PATH`.
+/// project `node_modules/.bin`, Greg-managed install, then `PATH`.
 pub fn resolve_command(cfg: &ServerConfig, root: &Path) -> PathBuf {
     let project = root.join("node_modules/.bin").join(&cfg.command);
     if project.is_file() {

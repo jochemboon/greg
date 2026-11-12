@@ -2,7 +2,7 @@
 //! is opened and on every save.
 //!
 //! rust-analyzer keeps an index of the whole dependency graph in memory
-//! (often 1-2 GB), but Slate only uses its diagnostics. `cargo check` gives
+//! (often 1-2 GB), but Greg only uses its diagnostics. `cargo check` gives
 //! the compiler's own (most accurate) errors and keeps nothing in memory
 //! between runs. The trade-off: diagnostics update on save, not as you type.
 
@@ -427,7 +427,7 @@ mod tests {
     use serde_json::json;
 
     fn temp_project(name: &str, main: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("slate-check-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("greg-check-{name}-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(
             dir.join("Cargo.toml"),

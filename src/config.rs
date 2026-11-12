@@ -1,4 +1,4 @@
-//! Configuration: built-in defaults merged with ~/.config/slate/config.toml.
+//! Configuration: built-in defaults merged with ~/.config/greg/config.toml.
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -56,11 +56,11 @@ pub struct ServerConfig {
     pub settings: serde_json::Value,
     #[serde(default)]
     pub initialization_options: Option<serde_json::Value>,
-    /// npm packages that provide `command`; lets Slate install the server
+    /// npm packages that provide `command`; lets Greg install the server
     /// itself (with a private Node.js), so you don't need Node or npm.
     #[serde(default)]
     pub npm: Vec<String>,
-    /// URL of a standalone binary (optionally `.gz`) Slate can download.
+    /// URL of a standalone binary (optionally `.gz`) Greg can download.
     /// `{target}` expands to e.g. `x86_64-unknown-linux-gnu`.
     #[serde(default)]
     pub download: Option<String>,
@@ -79,7 +79,7 @@ pub fn config_path() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
         .unwrap_or_else(|| PathBuf::from("."));
-    base.join("slate").join("config.toml")
+    base.join("greg").join("config.toml")
 }
 
 /// Recursively merge `over` into `base`; tables merge, everything else replaces.

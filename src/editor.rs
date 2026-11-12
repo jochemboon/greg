@@ -1,5 +1,5 @@
 //! The text editing widget: renders only the visible part of a document and
-//! translates keyboard/mouse input into document commands.
+//! trangregs keyboard/mouse input into document commands.
 
 use crate::buffer::{Document, Severity, advance_col};
 use crate::highlight::{Highlighter, HlCache, ThemeColors};

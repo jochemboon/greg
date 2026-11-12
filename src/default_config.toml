@@ -1,13 +1,13 @@
-# Slate configuration.
+# Greg configuration.
 #
-# Your own file lives at ~/.config/slate/config.toml and is merged over these
+# Your own file lives at ~/.config/greg/config.toml and is merged over these
 # defaults, so you only need to write the keys you want to change, e.g.
 #
 #   font_size = 15
 #   [language_servers.eslint]
 #   enabled = false
 
-# Editor font: a family name as your system knows it (`slate --list-fonts`
+# Editor font: a family name as your system knows it (`greg --list-fonts`
 # lists the monospaced ones), optionally with a style, e.g. "JetBrains Mono",
 # "Fira Code:medium"; or the path of a .ttf/.otf file. It must be monospaced.
 # Unset or "" uses the built-in Hack.
@@ -20,7 +20,7 @@ line_height = 1.35
 # ui_font_size = 13.0
 tab_size = 4
 insert_spaces = true
-# Any bundled theme (`slate --list-themes`). "AAP-64" (built from the AAP-64
+# Any bundled theme (`greg --list-themes`). "AAP-64" (built from the AAP-64
 # pixel-art palette) also colours the UI; others include "OneHalfDark",
 # "OneHalfLight", "Dracula", "Nord", "Monokai Extended", "GitHub", "Solarized (dark)".
 theme = "AAP-64"
@@ -35,12 +35,12 @@ exclude_dirs = [".git", "node_modules", "target", ".venv", "__pycache__", "dist"
 # published standalone as `vscode-langservers-extracted`.
 #
 # You don't need Node or npm: servers with an `npm` (or `download`) entry can
-# be installed by Slate itself, into ~/.local/share/slate, with a private
+# be installed by Greg itself, into ~/.local/share/greg, with a private
 # Node.js runtime. Click "Install" next to the server in the status bar, use
-# View > Language Servers, or run `slate --install eslint json css ...`.
+# View > Language Servers, or run `greg --install eslint json css ...`.
 #
 # Commands are looked up in the project's node_modules/.bin first, then
-# Slate's own installs, then PATH.
+# Greg's own installs, then PATH.
 #
 # `settings` is what VSCode would send as the workspace configuration
 # (`workspace/configuration` and `workspace/didChangeConfiguration`).
@@ -114,7 +114,7 @@ settings = { python = { analysis = { autoSearchPaths = true, useLibraryCodeForTy
 # Rust: `cargo check` on open and save gives the compiler's own errors and
 # keeps nothing in memory between runs. rust-analyzer updates as you type but
 # indexes every dependency, often 1-2 GB of RAM, for completion/navigation
-# features Slate doesn't have yet. To use it instead:
+# features Greg doesn't have yet. To use it instead:
 #   [language_servers.rust-analyzer]
 #   enabled = true
 #   [language_servers.cargo-check]

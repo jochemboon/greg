@@ -29,7 +29,7 @@ const NEAR_BLACK: u32 = 0x141013;
 const NIGHT: u32 = 0x242234; // editor background
 const DUSK: u32 = 0x403353; // selection, borders
 const PLUM: u32 = 0x793a80;
-const SLATE: u32 = 0x333941;
+const GUNMETAL: u32 = 0x333941;
 const MIST: u32 = 0xdae0ea; // text
 const HAZE: u32 = 0xb3b9d1;
 const STEEL: u32 = 0x8b93af; // comments
@@ -197,7 +197,7 @@ pub fn theme() -> Theme {
     });
     Theme {
         name: Some(NAME.into()),
-        author: Some("Slate, using the AAP-64 palette by Adigun A. Polack".into()),
+        author: Some("Greg, using the AAP-64 palette by Adigun A. Polack".into()),
         settings: ThemeSettings {
             foreground: Some(rgb(MIST)),
             background: Some(rgb(NIGHT)),
@@ -226,7 +226,7 @@ pub fn adjust(c: &mut ThemeColors) {
         widget: c32(NIGHT),
         widget_hover: c32(DUSK),
         widget_active: c32(PLUM),
-        faint: c32(SLATE),
+        faint: c32(GUNMETAL),
         text: c32(HAZE),
         strong_text: c32(SNOW),
         selection: c32(DUSK),
