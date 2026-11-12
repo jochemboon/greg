@@ -113,6 +113,7 @@ impl App {
         let hl = Highlighter::new(&cfg.theme);
         let colors = hl.colors();
         apply_visuals(&cc.egui_ctx, &colors);
+        let font_errors = crate::fonts::apply(&cc.egui_ctx, &cfg);
         let lsp = LspManager::new(
             cfg.language_servers.clone(),
             root.clone(),
@@ -147,6 +148,7 @@ impl App {
             app.set_status(format!("Config error: {e}"));
             app.log("config", e);
         }
+        app.report_font_errors(font_errors);
         for f in files {
             app.open_path(&f);
         }
@@ -458,6 +460,7 @@ impl App {
         }
         let servers_changed =
             format!("{:?}", cfg.language_servers) != format!("{:?}", self.cfg.language_servers);
+        let fonts_changed = crate::fonts::settings(&cfg) != crate::fonts::settings(&self.cfg);
         self.hl = Highlighter::new(&cfg.theme);
         self.colors = self.hl.colors();
         if let Some(ctx) = &self.ctx {
@@ -477,6 +480,17 @@ impl App {
             }
         }
         self.set_status("Settings reloaded");
+        if fonts_changed && let Some(ctx) = self.ctx.clone() {
+            let errors = crate::fonts::apply(&ctx, &self.cfg);
+            self.report_font_errors(errors);
+        }
+    }
+
+    fn report_font_errors(&mut self, errors: Vec<String>) {
+        for e in errors {
+            self.set_status(e.clone());
+            self.log("config", e);
+        }
     }
 
     fn open_settings(&mut self) {
@@ -1280,6 +1294,7 @@ impl App {
             hl: &self.hl,
             colors: &self.colors,
             font_size: self.cfg.font_size,
+            line_height: self.cfg.line_height,
             matches: if show_matches {
                 &self.find.matches
             } else {
@@ -2140,7 +2155,11 @@ const USER_CONFIG_TEMPLATE: &str = "\
 # run `slate --print-default-config` to see every option and the
 # preconfigured language servers. Saving this file reloads it.
 
+# font_family = \"JetBrains Mono\"   # `slate --list-fonts` lists monospaced fonts
 # font_size = 14.0
+# line_height = 1.35
+# ui_font_family = \"Inter\"
+# ui_font_size = 13.0
 # tab_size = 4
 # theme = \"OneHalfDark\"
 
@@ -2294,7 +2313,7 @@ fn absolute(p: &Path) -> PathBuf {
     }
 }
 
-fn expand_tilde(s: &str) -> PathBuf {
+pub fn expand_tilde(s: &str) -> PathBuf {
     if let (Some(rest), Some(home)) = (s.strip_prefix("~/"), std::env::var_os("HOME")) {
         PathBuf::from(home).join(rest)
     } else {

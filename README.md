@@ -79,6 +79,22 @@ change. `slate --print-default-config` shows everything, and
 the colours of the [AAP-64](https://lospec.com/palette-list/aap-64) pixel-art
 palette and colours the whole UI, not just the code.
 
+Fonts are set the same way:
+
+```toml
+font_family = "JetBrains Mono"     # editor font; must be monospaced
+font_size = 14.0
+line_height = 1.35                 # multiple of the font's height
+ui_font_family = "Inter"           # menus, tabs, sidebar, panels
+ui_font_size = 13.0
+```
+
+Give a family name as your system knows it, optionally with a style
+(`"Fira Code:medium"`), or the path of a `.ttf`/`.otf` file. Names are looked
+up with fontconfig, and `slate --list-fonts` lists the monospaced fonts you have.
+A font that's missing or unusable is reported in the status bar, and the
+built-in font is used instead.
+
 ## Keys
 
 | | |
@@ -103,6 +119,7 @@ src/highlight.rs   incremental syntect highlighting (TextMate grammars)
 src/lsp.rs         LSP client: push + pull diagnostics, UTF-8/16 positions
 src/watch.rs       background poller that spots open files changing on disk
 src/config.rs      settings loading/merging; defaults in default_config.toml
+src/fonts.rs       font settings: lookup via fontconfig, checks, installing in egui
 src/aap64.rs       the built-in AAP-64 colour scheme
 src/install.rs     managed installs: private Node.js + npm servers, binary downloads
 ```

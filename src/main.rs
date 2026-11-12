@@ -6,6 +6,7 @@ mod app;
 mod buffer;
 mod config;
 mod editor;
+mod fonts;
 mod highlight;
 mod install;
 mod lang;
@@ -24,6 +25,7 @@ USAGE:
 OPTIONS:
     --print-default-config   Print the built-in configuration and exit
     --list-themes            List bundled syntax themes and exit
+    --list-fonts             List installed monospaced fonts (for `font_family`)
     --list-servers           Show configured language servers
     --install SERVER...      Install language servers (e.g. eslint json css html
                              typescript pyright rust-analyzer) into
@@ -65,6 +67,16 @@ fn main() -> eframe::Result {
                     };
                     let state = if s.enabled { "" } else { " (disabled)" };
                     println!("{name:18} {:52} {how}{state}", s.languages.join(","));
+                }
+                return Ok(());
+            }
+            "--list-fonts" => {
+                match fonts::list_monospace() {
+                    Ok(names) => names.iter().for_each(|n| println!("{n}")),
+                    Err(e) => {
+                        eprintln!("{e}");
+                        std::process::exit(1);
+                    }
                 }
                 return Ok(());
             }

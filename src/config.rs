@@ -8,7 +8,19 @@ pub const DEFAULT_CONFIG: &str = include_str!("default_config.toml");
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
+    /// Editor font size.
     pub font_size: f32,
+    /// Editor font: a family name or a font file path (empty: built-in).
+    #[serde(default)]
+    pub font_family: Option<String>,
+    /// Editor line height as a multiple of the font's height.
+    #[serde(default = "default_line_height")]
+    pub line_height: f32,
+    /// Font for menus, tabs, panels etc. (empty: built-in).
+    #[serde(default)]
+    pub ui_font_family: Option<String>,
+    #[serde(default)]
+    pub ui_font_size: Option<f32>,
     pub tab_size: usize,
     pub insert_spaces: bool,
     pub theme: String,
@@ -39,6 +51,10 @@ pub struct ServerConfig {
     /// `{target}` expands to e.g. `x86_64-unknown-linux-gnu`.
     #[serde(default)]
     pub download: Option<String>,
+}
+
+fn default_line_height() -> f32 {
+    1.35
 }
 
 fn yes() -> bool {

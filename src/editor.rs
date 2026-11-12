@@ -50,6 +50,8 @@ pub struct EditorParams<'a> {
     pub hl: &'a Highlighter,
     pub colors: &'a ThemeColors,
     pub font_size: f32,
+    /// Line height as a multiple of the font's row height.
+    pub line_height: f32,
     /// Find-in-file matches (char ranges, sorted).
     pub matches: &'a [(usize, usize)],
 }
@@ -64,7 +66,7 @@ struct Metrics {
 pub fn editor_ui(ui: &mut Ui, doc: &mut Document, id: Id, p: &EditorParams) {
     let font = FontId::monospace(p.font_size);
     let (char_w, row_h) = ui.fonts_mut(|f| (f.glyph_width(&font, 'M'), f.row_height(&font)));
-    let line_h = (row_h * 1.35).round();
+    let line_h = (row_h * p.line_height.clamp(1.0, 3.0)).round();
     let m = Metrics {
         font,
         char_w,

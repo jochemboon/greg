@@ -7,7 +7,17 @@
 #   [language_servers.eslint]
 #   enabled = false
 
+# Editor font: a family name as your system knows it (`slate --list-fonts`
+# lists the monospaced ones), optionally with a style, e.g. "JetBrains Mono",
+# "Fira Code:medium"; or the path of a .ttf/.otf file. It must be monospaced.
+# Unset or "" uses the built-in Hack.
+# font_family = "JetBrains Mono"
 font_size = 14.0
+# Line height as a multiple of the font's height.
+line_height = 1.35
+# Font and text size for menus, tabs, the sidebar and panels (any font works).
+# ui_font_family = "Inter"
+# ui_font_size = 13.0
 tab_size = 4
 insert_spaces = true
 # Any bundled theme (`slate --list-themes`). "AAP-64" (built from the AAP-64
